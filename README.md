@@ -19,6 +19,28 @@
 
 Напишите запрос к учебной базе данных, который вернёт процентное отношение общего размера всех индексов к общему размеру всех таблиц.
 
+### Решение 1
+
+```
+
+SELECT 
+    ROUND(
+        (SUM(index_size) * 100.0 / SUM(table_size)), 
+        2
+    ) AS index_to_table_ratio_percent
+FROM (
+    SELECT 
+        SUM(data_length + index_length) AS table_size,
+        SUM(index_length) AS index_size
+    FROM information_schema.tables
+    WHERE table_schema = 'sakila'
+    GROUP BY table_schema
+) AS sizes;
+
+```
+
+![Решение 1](https://github.com/noisy441/12-05-index/blob/main/img/img1.png)
+
 ### Задание 2
 
 Выполните explain analyze следующего запроса:
@@ -29,6 +51,39 @@ where date(p.payment_date) = '2005-07-30' and p.payment_date = r.rental_date and
 ```
 - перечислите узкие места;
 - оптимизируйте запрос: внесите корректировки по использованию операторов, при необходимости добавьте индексы.
+
+### Решение 2
+
+![Решение 2](https://github.com/noisy441/12-05-index/blob/main/img/img2.png)
+
+Узкими местами тут явно являются высокая стоимость запроса, значительное время на сканирование таблицы, большле количество обрабатываемых строк. Оконная функция для подсчета требует большого количества памяти. 
+
+Оптимизируем запрос, для чего переделаем неявные JOIN, немного оптимизируем фильтрацию и будем использовать GROUP BY вместо DISTINCT. Так же добавим индексы на поле payment_date, на поля соединений (customer_id, inventory_id) и на title в таблице film
+
+Переписанный вариант будет выглядеть так:
+
+```
+
+SELECT 
+    CONCAT(c.last_name, ' ', c.first_name) AS full_name,
+    SUM(p.amount) AS total_amount
+FROM payment p
+JOIN rental r ON p.payment_date = r.rental_date
+JOIN customer c ON r.customer_id = c.customer_id
+JOIN inventory i ON i.inventory_id = r.inventory_id
+JOIN film f ON i.film_id = f.film_id
+WHERE DATE(p.payment_date) = '2005-07-30' 
+GROUP BY 
+    c.customer_id,
+    c.last_name,
+    c.first_name,
+    f.title;
+
+```
+
+![Решение ](https://github.com/noisy441/12-05-index/blob/main/img/img3.png)
+
+Значительно снизилась стоимость запроса и сократилось время выполнения.
 
 ## Дополнительные задания (со звёздочкой*)
 Эти задания дополнительные, то есть не обязательные к выполнению, и никак не повлияют на получение вами зачёта по этому домашнему заданию. Вы можете их выполнить, если хотите глубже шире разобраться в материале.
